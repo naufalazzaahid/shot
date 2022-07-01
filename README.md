@@ -1,2 +1,2 @@
-# shot
-Compile time dependency injection framework for swift
+# Shot
+Shot is a dependency injection framework based on Sourcery.

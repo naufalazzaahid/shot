@@ -1,0 +1,193 @@
+{% macro namedCheckParamUpper param %}{% if param|annotated:"named" %}{{ param.annotations.named|upperFirstLetter }}{{ param.typeName }}{% else %}{{ param.typeName|upperFirstLetter }}{% endif %}{% endmacro %}
+{% macro namedCheckParamLower param %}{% if param|annotated:"named" %}{{ param.annotations.named|lowerFirstLetter }}{{ param.typeName }}{% else %}{{ param.typeName|lowerFirstLetter }}{% endif %}{% endmacro %}
+{% macro namedCheckParam param %}{% if param|annotated:"named" %}{{ param.annotations.named|upperFirstLetter }}{{ param.typeName }}{% else %}{{ param.typeName }}{% endif %}{% endmacro %}
+{% macro namedCheckVar method %}{% if method|annotated:"named" %}{{ method.annotations.named|lowerFirstLetter }}{{ method.returnTypeName }}{% else %}{{ method.returnTypeName|lowerFirstLetter }}{% endif %}{% endmacro %}
+{% macro namedCheck method %}{% if method|annotated:"named" %}{{ method.annotations.named|upperFirstLetter }}{{ method.returnTypeName }}{% else %}{{ method.returnTypeName }}{% endif %}{% endmacro %}
+{% macro generateFunction method %}func provide{% call namedCheck method %}() -> {{ method.returnTypeName }}{% endmacro %}
+{% macro generateFactoryProvider modules %}
+{% for moduleType in modules where moduleType.type.based.FactoryModule %}
+{% for method in moduleType.type.allMethods %}
+  {%if method.parameters.count == 0 %}
+  {% call generateFunction method %} {
+    return {{ moduleType.name }}.{{ method.shortName }}()
+  }
+  {% else %}
+  {% call generateFunction method %} {
+    return {{ moduleType.name }}.{{ method.shortName }}(
+      {% for param in method.parameters %}
+      {{ param.name }}: provide{% call namedCheckParam param %}(){%if not forloop.last %},{% endif %}
+      {% endfor %}
+    )
+  }
+  {% endif %}
+
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+{% macro generateClassProvider modules %}
+{% for moduleType in type.variables where moduleType.type.based.ClassModule %}
+{% for method in moduleType.type.allMethods %}
+  var {% call namedCheckVar method %}: {{ method.returnTypeName }}!
+  {%if method.parameters.count == 0 %}
+  {% call generateFunction method %} {
+    if({% call namedCheckVar method %} == nil) {
+      {% call namedCheckVar method %} = {{ moduleType.name }}.{{ method.shortName }}()
+    }
+    return {% call namedCheckVar method %}
+  }
+{% else %}
+  {% call generateFunction method %} {
+    if({% call namedCheckVar method %} == nil) {
+      {% call namedCheckVar method %} = {{ moduleType.name }}.{{ method.shortName }}(
+      {% for param in method.parameters %}
+        {{ param.name }}: provide{% call namedCheckParam param %}(){%if not forloop.last %},{% endif %}
+      {% endfor %}
+      )
+    }
+    return {% call namedCheckVar method %}
+  }
+{% endif %}
+
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+{% macro generateSingletonProvider modules %}
+{% for moduleType in type.variables where moduleType.type.based.SingletonModule %}
+{% for method in moduleType.type.allMethods %}
+  static var {% call namedCheckVar method %}: {{ method.returnTypeName }}!
+
+  {%if method.parameters.count == 0 %}
+  {% call generateFunction method %} {
+    if({{ type.name }}_Generated.{% call namedCheckVar method %} == nil) {
+      {{ type.name }}_Generated.{% call namedCheckVar method %} = {{ moduleType.name }}.{{ method.shortName }}()
+    }
+    return {{ type.name }}_Generated.{% call namedCheckVar method %}
+  }
+  {% else %}
+  {% call generateFunction method %} {
+    if({{ type.name }}_Generated.{% call namedCheckVar method %} == nil) {
+      {{ type.name }}_Generated.{% call namedCheckVar method %} = {{ moduleType.name }}.{{ method.shortName }}(
+        {% for param in method.parameters %}
+        {{ param.name }}: provide{% call namedCheckParam param %}(){%if not forloop.last %},{% endif %}
+        {% endfor %}
+      )
+    }
+    return {{ type.name }}_Generated.{% call namedCheckVar method %}
+  }
+  {% endif %}
+
+{% endfor %}
+{% endfor %}
+{% endmacro %}
+{% macro generateInjection methods componentName %}
+{% for injectMethod in methods where injectMethod.shortName == "inject" %}
+// sourcery:file:../{{ injectMethod.parameters[0].type.name }}+Inject
+extension {{ injectMethod.parameters[0].type.name }} {
+  {% if injectMethod.parameters[0].type.kind == "struct" %}mutating {% endif %}func {{ injectMethod.shortName }}() {
+    let component = {{ componentName }}_Generated()
+    {% for injectable in injectMethod.parameters[0].type.variables  %}
+    {% for attribute in injectable.attributes where attribute == "Inject" %}
+    {{ injectable.name }} = component.provide{{ injectable.type.name }}()
+    {% endfor %}
+    {% endfor %}
+  }
+
+  {% for injectable in injectMethod.parameters[0].type.variables  %}
+  {% for attribute in injectable.attributes where attribute == "StateObject" %}
+  static func get() -> {{ injectable.type.name }} {
+    let component = {{ componentName }}_Generated()
+    return component.provide{{ injectable.type.name }}()
+  }
+  {% endfor %}
+  {% endfor %}
+}
+{% if injectMethod.parameters[0].type.based.View %}
+//A view
+{% endif %}
+// sourcery:end
+{% endfor %}
+{% endmacro %}
+{% macro generateBuilderClass methods componentName modules %}
+{% for builderMethod in methods where builderMethod.shortName == "builder" %}
+// sourcery:file:../{{ componentName }}Builder
+class {{ componentName }}Builder_Generated {
+  static var shared: {{ componentName }}Builder_Generated? = nil
+  {% for param in builderMethod.parameters %}
+  let {% call namedCheckParamLower param %}: {{ param.typeName }}
+  {% endfor %}
+
+  init(
+    {% for param in builderMethod.parameters %}
+    {{ param.name }}: {{ param.typeName }}{%if not forloop.last %},{% endif %}
+    {% endfor %}
+  ) {
+    {% for param in builderMethod.parameters %}
+    self.{% call namedCheckParamLower param %} = {{ param.name }}
+    {% endfor %}
+  }
+}
+
+class Shot{{ componentName }}{
+  static func create(
+    {% for param in builderMethod.parameters %}
+    {{ param.name }}: {{ param.typeName }}{%if not forloop.last %},{% endif %}
+    {% endfor %}
+  ) {
+    {{ componentName }}Builder_Generated.shared = {{ componentName }}Builder_Generated(
+      {% for param in builderMethod.parameters %}
+      {{ param.name }}: {{ param.name }}{%if not forloop.last %},{% endif %}
+      {% endfor %}
+    )
+  }
+
+  static func close() {
+    {{ componentName }}Builder_Generated.shared = nil
+    {% for moduleType in type.variables where moduleType.type.based.SingletonModule %}
+    {% for method in moduleType.type.allMethods %}
+    {{ componentName }}_Generated.{% call namedCheckVar method %} = nil
+    {% endfor %}
+    {% endfor %}
+  }
+}
+// sourcery:end
+{% endfor %}
+{% endmacro %}
+{% macro generateBuilder methods componentName modules %}
+{% for builderMethod in methods where builderMethod.shortName == "builder" %}
+{% for param in builderMethod.parameters %}
+  func provide{% call namedCheckParamUpper param %}() -> {{ param.typeName }} {
+    let component = try! get{{ componentName }}Builder()
+    return component.{% call namedCheckParamLower param %}
+  }
+
+{% endfor %}
+  func get{{ componentName }}Builder() throws -> {{ componentName }}Builder_Generated {
+    guard let component = {{ componentName }}Builder_Generated.shared else {
+      throw DIComponentError("{{ componentName }} not yet initialized")
+    }
+    return component
+  }
+{% endfor %}
+{% endmacro %}
+{% for type in types.protocols where type.based.DIComponent or type|annotated:"DIComponent" %}{% if type.name != "DIComponent" %}
+// sourcery:file:../{{ type.name }}
+class {{ type.name }}_Generated {
+  {% for moduleType in type.variables %}
+  let {{ moduleType.name }} = {{ moduleType.typeName }}()
+  {% endfor %}
+
+  init() {
+    let _ = try! get{{ type.name }}Builder()
+  }
+
+  {% call generateFactoryProvider type.variables %}
+  {% call generateClassProvider type.variables %}
+  {% call generateSingletonProvider type.variables %}
+  {% call generateBuilder type.allMethods type.name type.variables %}
+}
+{% endif %}
+// sourcery:end
+{% call generateBuilderClass type.allMethods type.name type.variables %}
+{% call generateInjection type.allMethods type.name %}
+{% endfor %}
+
