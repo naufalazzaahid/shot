@@ -1,13 +1,13 @@
-@propertyWrapper struct Inject<Value> {
+@propertyWrapper public struct Inject<Value> {
   var wrappedValue: Value
-  init(wrappedValue: Value) {
+  public init(wrappedValue: Value) {
     self.wrappedValue = wrappedValue
   }
 }
 
-@propertyWrapper struct AssistedInject<Value> {
+@propertyWrapper public struct AssistedInject<Value> {
   var wrappedValue: Value
-  init(wrappedValue: Value) {
+  public init(wrappedValue: Value) {
     self.wrappedValue = wrappedValue
   }
 }
