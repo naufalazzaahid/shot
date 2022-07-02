@@ -1,7 +1,7 @@
-protocol DIModule {}
+public protocol DIModule {}
 
-protocol FactoryModule: DIModule {}
+public protocol FactoryModule: DIModule {}
 
-protocol SingletonModule: DIModule {}
+public protocol SingletonModule: DIModule {}
 
-protocol ClassModule: DIModule {}
+public protocol ClassModule: DIModule {}

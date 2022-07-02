@@ -1,9 +1,9 @@
 public protocol DIComponent {}
 
-class DIComponentError: Error {
-  let message: String
+public class DIComponentError: Error {
+  public let message: String
   
-  init(_ message: String) {
+  public init(_ message: String) {
     self.message = message
   }
 }
