@@ -14,9 +14,9 @@ Compile time dependency injection.
 
   s.ios.deployment_target = '15.0'
 
-  s.source_files = 'Shot/Module/**/*.{swift}'
+  s.source_files = 'Source/Module/**/*.{swift}'
   s.resource_bundles = {
-    'Shot' => ['Shot/Module/**/*.xcassets']
+    'Shot' => ['Source/Module/**/*.xcassets']
   }
 
   s.static_framework = true
@@ -24,6 +24,6 @@ Compile time dependency injection.
   s.dependency 'Sourcery'
 
   s.test_spec 'Tests' do |test_spec|
-      test_spec.source_files = 'Shot/Tests/**/*.{swift}'
+      test_spec.source_files = 'Source/Tests/**/*.{swift}'
   end
 end
