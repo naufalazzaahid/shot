@@ -14,7 +14,7 @@ Compile time dependency injection.
 
   s.ios.deployment_target = '15.0'
 
-  s.source_files = 'Source/Module/**/*.{swift}'
+  s.source_files = 'Source/Module/**/*.{swift}','templates/**/*.{stencil}'
   s.resource_bundles = {
     'Shot' => ['Source/Module/**/*.xcassets']
   }
