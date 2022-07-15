@@ -81,7 +81,11 @@
 {% endmacro %}
 {% macro generateInjection methods componentName %}
 {% for injectMethod in methods where injectMethod.shortName == "inject" %}
-// sourcery:file:../{{ injectMethod.parameters[0].type.name }}+Inject
+// sourcery:file:{{ injectMethod.parameters[0].type.name }}+Inject
+{% for import in argument.imports %}
+import {{ import }}
+{% endfor %}
+
 extension {{ injectMethod.parameters[0].type.name }} {
   {% if injectMethod.parameters[0].type.kind == "struct" %}mutating {% endif %}func {{ injectMethod.shortName }}() {
     let component = {{ componentName }}_Generated()
@@ -109,7 +113,11 @@ extension {{ injectMethod.parameters[0].type.name }} {
 {% endmacro %}
 {% macro generateBuilderClass methods componentName modules %}
 {% for builderMethod in methods where builderMethod.shortName == "builder" %}
-// sourcery:file:../{{ componentName }}Builder
+// sourcery:file:{{ componentName }}Builder
+{% for import in argument.imports %}
+import {{ import }}
+{% endfor %}
+
 class {{ componentName }}Builder_Generated {
   static var shared: {{ componentName }}Builder_Generated? = nil
   {% for param in builderMethod.parameters %}
@@ -170,7 +178,11 @@ class Shot{{ componentName }}{
 {% endfor %}
 {% endmacro %}
 {% for type in types.protocols where type.based.DIComponent or type|annotated:"DIComponent" %}{% if type.name != "DIComponent" %}
-// sourcery:file:../{{ type.name }}
+// sourcery:file:{{ type.name }}
+{% for import in argument.imports %}
+import {{ import }}
+{% endfor %}
+
 class {{ type.name }}_Generated {
   {% for moduleType in type.variables %}
   let {{ moduleType.name }} = {{ moduleType.typeName }}()
@@ -190,4 +202,3 @@ class {{ type.name }}_Generated {
 {% call generateBuilderClass type.allMethods type.name type.variables %}
 {% call generateInjection type.allMethods type.name %}
 {% endfor %}
-
